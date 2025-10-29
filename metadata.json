@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Object Counter",
+  "description": "An application that uses the Gemini API to count specific objects in an image. Users can upload their own images or select from presets, provide labels for objects to count, and choose a model for analysis.",
+  "requestFramePermissions": []
+}
