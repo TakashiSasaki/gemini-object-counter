@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { PRESET_IMAGES, MODELS } from './constants';
 import { countObjectsInImage } from './services/geminiService';
@@ -12,7 +11,7 @@ import { SparklesIcon } from './components/icons';
 const App: React.FC = () => {
   const [presetImages, setPresetImages] = useState<PresetImage[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [labels, setLabels] = useState<string>('zebra, elephant, tree');
+  const [labels, setLabels] = useState<string>('');
   const [selectedModel, setSelectedModel] = useState<GeminiModel>('gemini-robotics-er-1.5-preview');
   const [results, setResults] = useState<ObjectCounts | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -139,10 +138,10 @@ const App: React.FC = () => {
       <div className="max-w-7xl mx-auto">
         <header className="text-center mb-8">
           <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-500">
-            Gemini Object Counter
+            WIMC Object Counter
           </h1>
           <p className="mt-2 text-lg text-gray-400 max-w-2xl mx-auto">
-            Upload an image, provide labels, and let Gemini count the objects for you.
+            Upload an image, provide labels, and let the AI count the objects for you.
           </p>
         </header>
 
