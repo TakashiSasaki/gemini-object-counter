@@ -9,7 +9,6 @@ export const PRESET_IMAGES: PresetImage[] = [
 
 export const MODELS: ModelOption[] = [
   { id: 'gemini-robotics-er-1.5-preview', name: 'gemini-robotics-er-1.5-preview'},
-  { id: 'gemini-2.5-pro', name: 'gemini-2.5-pro' },
-  { id: 'gemini-2.5-flash', name: 'gemini-2.5-flash' },
-  { id: 'gemini-2.5-flash-lite', name: 'gemini-2.5-flash-lite'}
+  { id: 'gemini-2.5-flash-lite', name: 'gemini-2.5-flash-lite'},
+  { id: 'gemini-2.5-flash', name: 'gemini-2.5-flash' }
 ];
