@@ -45,9 +45,9 @@ export const countObjectsInImage = async (
 
     let prompt: string;
     if (labels.length > 0) {
-      prompt = `Analyze the image and count the occurrences of the following objects: ${labels.join(', ')}.`;
+      prompt = `Analyze the image and count the occurrences of the following objects: ${labels.join(', ')}. Format the response according to the provided JSON schema. For any requested object not found in the image, include it in the response with a count of 0.`;
     } else {
-      prompt = `Analyze the image and identify all distinct objects. For each object type you identify, provide its name and the total count of its occurrences in the image. Return an empty array if no objects are found.`;
+      prompt = `Analyze the image and identify all distinct objects. For each object type you identify, provide its name and the total count of its occurrences. Format the response according to the provided JSON schema. If no objects are found, return an object with an empty "counts" array.`;
     }
 
     const response = await ai.models.generateContent({

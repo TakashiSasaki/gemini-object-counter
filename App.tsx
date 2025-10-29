@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { PRESET_IMAGES, MODELS } from './constants';
 import { countObjectsInImage } from './services/geminiService';
 import { GeminiModel, ObjectCounts, PresetImage } from './types';
@@ -9,15 +10,15 @@ import ResultDisplay from './components/ResultDisplay';
 import { SparklesIcon } from './components/icons';
 
 const App: React.FC = () => {
-  const [presetImages, setPresetImages] = useState<PresetImage[]>(PRESET_IMAGES);
-  const [selectedImage, setSelectedImage] = useState<string | null>(presetImages[0].src);
+  const [presetImages, setPresetImages] = useState<PresetImage[]>([]);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [labels, setLabels] = useState<string>('zebra, elephant, tree');
-  const [selectedModel, setSelectedModel] = useState<GeminiModel>(MODELS[0].id);
+  const [selectedModel, setSelectedModel] = useState<GeminiModel>('gemini-robotics-er-1.5-preview');
   const [results, setResults] = useState<ObjectCounts | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSubmitted, setHasSubmitted] = useState<boolean>(false);
-  const [isRefreshingPresets, setIsRefreshingPresets] = useState<boolean>(false);
+  const [isRefreshingPresets, setIsRefreshingPresets] = useState<boolean>(true);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -40,44 +41,69 @@ const App: React.FC = () => {
     setHasSubmitted(false);
   };
 
-  const handleRefreshPresets = async () => {
-    setIsRefreshingPresets(true);
-
-    const imageLoadPromises = presetImages.map(img => 
-      new Promise<PresetImage>((resolve, reject) => {
-        const newSrc = `https://picsum.photos/seed/${img.id}${Math.random()}/800/600`;
-        const image = new Image();
-        image.src = newSrc;
-        image.onload = () => resolve({ ...img, src: newSrc });
-        image.onerror = () => reject(`Failed to load ${newSrc}`);
-      })
-    );
-
-    try {
-      const newPresets = await Promise.all(imageLoadPromises);
-      setPresetImages(newPresets);
-      handlePresetSelect(newPresets[0].src);
-    } catch (error) {
-      console.error("Error loading new preset images:", error);
-      setError("Failed to load new images. Please try again.");
-    } finally {
-      setIsRefreshingPresets(false);
-    }
-  };
-
-  const imageUrlToDataUrl = async (url: string): Promise<string> => {
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch image from ${url}: ${response.statusText}`);
-    }
-    const blob = await response.blob();
+  /**
+   * Fetches an image from a dynamic URL, converts it to a stable data URL via canvas,
+   * and returns an updated PresetImage object. This prevents inconsistencies where
+   * the same URL could resolve to different images.
+   * @param preset The original preset image object.
+   * @returns A promise that resolves to a new PresetImage with a stable data URL src.
+   */
+  const stabilizePresetImage = (preset: PresetImage): Promise<PresetImage> => {
     return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
+        const keywordsMap: { [key: string]: string } = {
+            'animals': 'safari,animals',
+            'tableware': 'tableware,dinner',
+            'cars': 'car,parking',
+            'stationery': 'stationery,desk',
+        };
+        const keywords = keywordsMap[preset.id] || preset.id;
+        const randomSrc = `https://loremflickr.com/800/600/${keywords}?random=${Math.random()}`;
+
+        const image = new Image();
+        image.crossOrigin = 'Anonymous';
+        image.src = randomSrc;
+
+        image.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = image.naturalWidth;
+            canvas.height = image.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                return reject(new Error('Could not get canvas context'));
+            }
+            ctx.drawImage(image, 0, 0);
+            const dataUrl = canvas.toDataURL('image/jpeg');
+            resolve({ ...preset, src: dataUrl });
+        };
+        image.onerror = () => reject(new Error(`Failed to load preset image for: ${keywords}`));
     });
   };
+
+  /**
+   * Loads a new set of preset images by fetching them and converting them to stable data URLs.
+   */
+  const loadPresets = async () => {
+    setIsRefreshingPresets(true);
+    setError(null);
+    try {
+        const stabilizedPresets = await Promise.all(PRESET_IMAGES.map(stabilizePresetImage));
+        setPresetImages(stabilizedPresets);
+        if (stabilizedPresets.length > 0) {
+            handlePresetSelect(stabilizedPresets[0].src);
+        }
+    } catch (err) {
+        console.error("Error loading preset images:", err);
+        setError(err instanceof Error ? err.message : "Failed to load images. Please try again.");
+    } finally {
+        setIsRefreshingPresets(false);
+    }
+  };
+
+  // Load initial presets when the component mounts.
+  useEffect(() => {
+    loadPresets();
+  }, []);
+
 
   const handleSubmit = async () => {
     if (!selectedImage) {
@@ -92,12 +118,8 @@ const App: React.FC = () => {
     setHasSubmitted(true);
 
     try {
-      let imageForApi = selectedImage;
-      if (!selectedImage.startsWith('data:image')) {
-        imageForApi = await imageUrlToDataUrl(selectedImage);
-      }
-
-      const apiResults = await countObjectsInImage(imageForApi, labelList, selectedModel);
+      // The selectedImage is now always a data URL, so no conversion is needed.
+      const apiResults = await countObjectsInImage(selectedImage, labelList, selectedModel);
       const resultsObject = apiResults.reduce((acc: ObjectCounts, item) => {
         acc[item.label] = item.count;
         return acc;
@@ -131,7 +153,7 @@ const App: React.FC = () => {
               selectedImage={selectedImage}
               onSelect={handlePresetSelect}
               onFileUpload={handleFileUpload}
-              onRefresh={handleRefreshPresets}
+              onRefresh={loadPresets}
               isRefreshing={isRefreshingPresets}
             />
             <LabelInput 
@@ -159,8 +181,8 @@ const App: React.FC = () => {
           <div className="bg-gray-800 p-6 rounded-xl shadow-2xl flex flex-col items-center justify-center min-h-[400px]">
             {selectedImage ? (
               <div className="relative w-full aspect-video rounded-lg overflow-hidden border-2 border-gray-700">
-                <img src={selectedImage} alt="Selected for analysis" className="w-full h-full object-contain" />
-                <div className="absolute inset-0 flex items-end justify-center p-4">
+                <img src={selectedImage} alt="Selected for analysis" className={`w-full h-full object-contain transition-opacity duration-300 ${isLoading ? 'opacity-30' : 'opacity-100'}`} />
+                <div className="absolute inset-0 flex items-center justify-center p-4">
                     <ResultDisplay
                       isLoading={isLoading}
                       error={error}
@@ -171,7 +193,7 @@ const App: React.FC = () => {
               </div>
             ) : (
               <div className="text-center text-gray-500">
-                <p>Please select or upload an image to begin.</p>
+                <p>Loading preset images...</p>
               </div>
             )}
           </div>
